@@ -70,6 +70,41 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <script>
+        // --- AUDIO SYNTHESIZER (Retro Sounds) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playShootSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume(); // Browsers require this to unlock audio
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch start
+            osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1); // Drop pitch quickly
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime); // Volume
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); // Fade out
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playHitSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime); // Low pitch start
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2); // Drop pitch
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+        }
+        // ----------------------------------------
+
         // 1. SETTING UP THE WORLD
         const scene = new THREE.Scene();
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -111,11 +146,10 @@
         rightWing.position.set(0.8, 0, 0);
         bird.add(rightWing);
 
-        // Reticle pushed farther out
         const reticleGeom = new THREE.RingGeometry(0.5, 0.6, 16);
         const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
         const reticle = new THREE.Mesh(reticleGeom, reticleMat);
-        reticle.position.z = -20; // Pushed way back into the distance
+        reticle.position.z = -20; 
         bird.add(reticle);
 
         scene.add(bird);
@@ -137,12 +171,16 @@
         const forwardDirection = new THREE.Vector3(0, 0, -1);
 
         function shootFeather() {
-            const featherGeom = new THREE.BoxGeometry(0.1, 0.05, 0.4);
-            const featherMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            // INCREASED SIZE AND CHANGED TO YELLOW
+            const featherGeom = new THREE.BoxGeometry(0.3, 0.1, 0.8); 
+            const featherMat = new THREE.MeshLambertMaterial({ color: 0xffff00 }); 
             const feather = new THREE.Mesh(featherGeom, featherMat);
             feather.position.set(bird.position.x, bird.position.y, bird.position.z - 1);
             scene.add(feather);
             feathers.push(feather);
+
+            // Trigger the retro shooting sound
+            playShootSound();
         }
 
         // 4. BUILDING ENEMY BIRDS
@@ -150,29 +188,26 @@
             const enemyGroup = new THREE.Group();
             let bColor, wColor, beakColor, scale;
 
-            if (type === 1) { // Fast Red Bird
+            if (type === 1) { 
                 bColor = 0xff4444; wColor = 0xcc0000; beakColor = 0xffcc00; scale = 0.8;
                 enemyGroup.enemyType = 1;
-            } else { // Chasing Purple Bird
+            } else { 
                 bColor = 0x8800ff; wColor = 0x5500aa; beakColor = 0xff8800; scale = 1.2;
                 enemyGroup.enemyType = 2;
             }
 
-            // Enemy Body
             const eBodyMat = new THREE.MeshLambertMaterial({ color: bColor });
             const eBody = new THREE.Mesh(new THREE.SphereGeometry(0.6 * scale, 16, 16), eBodyMat);
-            eBody.originalColor = bColor; // Save original color for when we stop aiming at it
+            eBody.originalColor = bColor; 
             enemyGroup.add(eBody);
 
-            // Enemy Beak (Pointing towards camera/player)
             const eBeakMat = new THREE.MeshLambertMaterial({ color: beakColor });
             const eBeak = new THREE.Mesh(new THREE.ConeGeometry(0.2 * scale, 0.6 * scale, 8), eBeakMat);
-            eBeak.rotation.x = Math.PI / 2; // Point forward
+            eBeak.rotation.x = Math.PI / 2; 
             eBeak.position.z = 0.7 * scale;
             eBeak.originalColor = beakColor;
             enemyGroup.add(eBeak);
 
-            // Enemy Wings
             const eWingMat = new THREE.MeshLambertMaterial({ color: wColor });
             const eLeftWing = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, 0.1 * scale, 0.5 * scale), eWingMat);
             eLeftWing.position.set(-0.8 * scale, 0, 0);
@@ -184,7 +219,6 @@
             eRightWing.originalColor = wColor;
             enemyGroup.add(eRightWing);
 
-            // Store wings in the group so we can animate them later
             enemyGroup.leftWing = eLeftWing;
             enemyGroup.rightWing = eRightWing;
 
@@ -198,7 +232,7 @@
 
             const randomX = (Math.random() - 0.5) * 20; 
             const randomY = (Math.random() - 0.5) * 12;
-            enemy.position.set(randomX, randomY, -40); // Spawn further back
+            enemy.position.set(randomX, randomY, -40); 
             
             scene.add(enemy);
             enemies.push(enemy);
@@ -229,6 +263,7 @@
             lives -= 1;
             livesText.innerText = lives;
             bird.position.z += 1.5; 
+            playHitSound(); // Play sound when you take damage too!
             
             const flash = document.getElementById('damageFlash');
             flash.style.opacity = 0.5;
@@ -256,7 +291,6 @@
             rightWing.rotation.z = -Math.sin(time) * 0.4;
 
             // Raycasting / Aim Detection
-            // 1. Reset all enemy colors first
             enemies.forEach(enemyBird => {
                 enemyBird.children.forEach(part => {
                     part.material.color.setHex(part.originalColor);
@@ -264,15 +298,12 @@
             });
             reticle.material.color.setHex(0x00ff00); 
             
-            // 2. Cast ray. 'true' means we check inside the enemy groups
             raycaster.set(bird.position, forwardDirection);
             const intersects = raycaster.intersectObjects(enemies, true);
             
             if (intersects.length > 0) {
                 reticle.material.color.setHex(0xff0000); 
-                // Find the parent group of the specific part we hit
                 const hitParent = intersects[0].object.parent; 
-                // Turn all parts of that enemy bird white
                 hitParent.children.forEach(part => {
                     part.material.color.setHex(0xffffff);
                 });
@@ -295,12 +326,10 @@
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
                 
-                // Flap Enemy Wings! Purple flaps slower than Red.
                 let flapSpeed = e.enemyType === 1 ? time * 1.5 : time * 0.8;
                 e.leftWing.rotation.z = Math.sin(flapSpeed) * 0.4;
                 e.rightWing.rotation.z = -Math.sin(flapSpeed) * 0.4;
 
-                // Enemy Movement Logic
                 if (e.enemyType === 1) {
                     e.position.z += 0.25; 
                 } else {
@@ -321,7 +350,6 @@
                 let enemyDestroyed = false;
                 for (let j = feathers.length - 1; j >= 0; j--) {
                     let f = feathers[j];
-                    // Birds are a bit bigger now, so we increased hit distance to 1.2
                     if (e.position.distanceTo(f.position) < 1.2) {
                         scene.remove(e); scene.remove(f);
                         enemies.splice(i, 1); feathers.splice(j, 1);
@@ -329,6 +357,10 @@
                         score += (e.enemyType === 1) ? 10 : 20; 
                         scoreText.innerText = score;
                         enemyDestroyed = true;
+                        
+                        // Trigger the retro hit sound!
+                        playHitSound(); 
+                        
                         break; 
                     }
                 }
