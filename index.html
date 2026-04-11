@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Bird Shooter - Full Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+        }
+        .ui-text { margin-bottom: 10px; }
+        
+        #gameOver {
+            display: none; 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 4px solid red;
+        }
+        #gameOver h1 { margin: 0 0 20px 0; color: #ff4444; font-size: 48px;}
+        #gameOver button {
+            font-size: 24px;
+            padding: 10px 30px;
+            background: #44aa44;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #gameOver button:hover { background: #55cc55; }
+        
+        #damageFlash {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: red;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="ui-text">Score: <span id="scoreText">0</span></div>
+        <div class="ui-text">Lives: <span id="livesText" style="color: #ffaaaa;">5</span></div>
+    </div>
+    
+    <div id="damageFlash"></div>
+
+    <div id="gameOver">
+        <h1>GAME OVER</h1>
+        <div class="ui-text">Final Score: <span id="finalScore">0</span></div>
+        <button onclick="location.reload()">Play Again</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // 1. SETTING UP THE WORLD
+        const scene = new THREE.Scene();
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 6;
+        camera.position.y = 2;
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. CREATING THE PLAYER BIRD
+        const bird = new THREE.Group();
+
+        const bodyGeom = new THREE.SphereGeometry(0.6, 16, 16);
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0xffdd00 }); 
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        bird.add(body);
+
+        const beakGeom = new THREE.ConeGeometry(0.2, 0.6, 8);
+        const beakMat = new THREE.MeshLambertMaterial({ color: 0xff8800 }); 
+        const beak = new THREE.Mesh(beakGeom, beakMat);
+        beak.rotation.x = -Math.PI / 2; 
+        beak.position.z = -0.7;
+        bird.add(beak);
+
+        const wingGeom = new THREE.BoxGeometry(1.2, 0.1, 0.5);
+        const wingMat = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
+        const leftWing = new THREE.Mesh(wingGeom, wingMat);
+        leftWing.position.set(-0.8, 0, 0);
+        bird.add(leftWing);
+        const rightWing = new THREE.Mesh(wingGeom, wingMat);
+        rightWing.position.set(0.8, 0, 0);
+        bird.add(rightWing);
+
+        // Reticle pushed farther out
+        const reticleGeom = new THREE.RingGeometry(0.5, 0.6, 16);
+        const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+        const reticle = new THREE.Mesh(reticleGeom, reticleMat);
+        reticle.position.z = -20; // Pushed way back into the distance
+        bird.add(reticle);
+
+        scene.add(bird);
+
+        // 3. GAME VARIABLES
+        const feathers = [];
+        const enemies = [];
+        let score = 0;
+        let lives = 5;
+        let isGameOver = false;
+        
+        const scoreText = document.getElementById('scoreText');
+        const livesText = document.getElementById('livesText');
+        
+        let lastShotTime = 0;
+        const shootCooldown = 200;
+
+        const raycaster = new THREE.Raycaster();
+        const forwardDirection = new THREE.Vector3(0, 0, -1);
+
+        function shootFeather() {
+            const featherGeom = new THREE.BoxGeometry(0.1, 0.05, 0.4);
+            const featherMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const feather = new THREE.Mesh(featherGeom, featherMat);
+            feather.position.set(bird.position.x, bird.position.y, bird.position.z - 1);
+            scene.add(feather);
+            feathers.push(feather);
+        }
+
+        // 4. BUILDING ENEMY BIRDS
+        function createEnemyBird(type) {
+            const enemyGroup = new THREE.Group();
+            let bColor, wColor, beakColor, scale;
+
+            if (type === 1) { // Fast Red Bird
+                bColor = 0xff4444; wColor = 0xcc0000; beakColor = 0xffcc00; scale = 0.8;
+                enemyGroup.enemyType = 1;
+            } else { // Chasing Purple Bird
+                bColor = 0x8800ff; wColor = 0x5500aa; beakColor = 0xff8800; scale = 1.2;
+                enemyGroup.enemyType = 2;
+            }
+
+            // Enemy Body
+            const eBodyMat = new THREE.MeshLambertMaterial({ color: bColor });
+            const eBody = new THREE.Mesh(new THREE.SphereGeometry(0.6 * scale, 16, 16), eBodyMat);
+            eBody.originalColor = bColor; // Save original color for when we stop aiming at it
+            enemyGroup.add(eBody);
+
+            // Enemy Beak (Pointing towards camera/player)
+            const eBeakMat = new THREE.MeshLambertMaterial({ color: beakColor });
+            const eBeak = new THREE.Mesh(new THREE.ConeGeometry(0.2 * scale, 0.6 * scale, 8), eBeakMat);
+            eBeak.rotation.x = Math.PI / 2; // Point forward
+            eBeak.position.z = 0.7 * scale;
+            eBeak.originalColor = beakColor;
+            enemyGroup.add(eBeak);
+
+            // Enemy Wings
+            const eWingMat = new THREE.MeshLambertMaterial({ color: wColor });
+            const eLeftWing = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, 0.1 * scale, 0.5 * scale), eWingMat);
+            eLeftWing.position.set(-0.8 * scale, 0, 0);
+            eLeftWing.originalColor = wColor;
+            enemyGroup.add(eLeftWing);
+
+            const eRightWing = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, 0.1 * scale, 0.5 * scale), eWingMat);
+            eRightWing.position.set(0.8 * scale, 0, 0);
+            eRightWing.originalColor = wColor;
+            enemyGroup.add(eRightWing);
+
+            // Store wings in the group so we can animate them later
+            enemyGroup.leftWing = eLeftWing;
+            enemyGroup.rightWing = eRightWing;
+
+            return enemyGroup;
+        }
+
+        function spawnEnemy() {
+            if (isGameOver) return;
+            const type = Math.random() > 0.5 ? 1 : 2; 
+            const enemy = createEnemyBird(type);
+
+            const randomX = (Math.random() - 0.5) * 20; 
+            const randomY = (Math.random() - 0.5) * 12;
+            enemy.position.set(randomX, randomY, -40); // Spawn further back
+            
+            scene.add(enemy);
+            enemies.push(enemy);
+        }
+
+        setInterval(spawnEnemy, 1500);
+
+        // 5. CONTROLS
+        let isFiring = false;
+        let targetX = 0; 
+        let targetY = 0;
+
+        function updatePointer(clientX, clientY) {
+            const normalizedX = (clientX / window.innerWidth) * 2 - 1;
+            const normalizedY = -(clientY / window.innerHeight) * 2 + 1;
+            targetX = normalizedX * 8; 
+            targetY = normalizedY * 5;
+        }
+
+        window.addEventListener('mousemove', (e) => updatePointer(e.clientX, e.clientY));
+        window.addEventListener('mousedown', () => isFiring = true);
+        window.addEventListener('mouseup', () => isFiring = false);
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); updatePointer(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+        window.addEventListener('touchstart', (e) => { e.preventDefault(); isFiring = true; updatePointer(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+        window.addEventListener('touchend', () => isFiring = false);
+
+        function takeDamage() {
+            lives -= 1;
+            livesText.innerText = lives;
+            bird.position.z += 1.5; 
+            
+            const flash = document.getElementById('damageFlash');
+            flash.style.opacity = 0.5;
+            setTimeout(() => flash.style.opacity = 0, 150);
+
+            if (lives <= 0) {
+                isGameOver = true;
+                document.getElementById('gameOver').style.display = 'block';
+                document.getElementById('finalScore').innerText = score;
+            }
+        }
+
+        // 6. THE GAME LOOP
+        function animate() {
+            if (isGameOver) return; 
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.01;
+
+            // Move Player Bird
+            bird.position.x += (targetX - bird.position.x) * 0.1;
+            bird.position.y += (targetY - bird.position.y) * 0.1;
+            bird.position.z += (0 - bird.position.z) * 0.1; 
+            leftWing.rotation.z = Math.sin(time) * 0.4;
+            rightWing.rotation.z = -Math.sin(time) * 0.4;
+
+            // Raycasting / Aim Detection
+            // 1. Reset all enemy colors first
+            enemies.forEach(enemyBird => {
+                enemyBird.children.forEach(part => {
+                    part.material.color.setHex(part.originalColor);
+                });
+            });
+            reticle.material.color.setHex(0x00ff00); 
+            
+            // 2. Cast ray. 'true' means we check inside the enemy groups
+            raycaster.set(bird.position, forwardDirection);
+            const intersects = raycaster.intersectObjects(enemies, true);
+            
+            if (intersects.length > 0) {
+                reticle.material.color.setHex(0xff0000); 
+                // Find the parent group of the specific part we hit
+                const hitParent = intersects[0].object.parent; 
+                // Turn all parts of that enemy bird white
+                hitParent.children.forEach(part => {
+                    part.material.color.setHex(0xffffff);
+                });
+            }
+
+            // Shoot Feathers
+            if (isFiring && (Date.now() - lastShotTime > shootCooldown)) {
+                shootFeather();
+                lastShotTime = Date.now();
+            }
+
+            for (let i = feathers.length - 1; i >= 0; i--) {
+                let f = feathers[i];
+                f.position.z -= 0.6; 
+                f.rotation.z += 0.1; 
+                if (f.position.z < -50) { scene.remove(f); feathers.splice(i, 1); }
+            }
+
+            // Move Enemy Birds
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                
+                // Flap Enemy Wings! Purple flaps slower than Red.
+                let flapSpeed = e.enemyType === 1 ? time * 1.5 : time * 0.8;
+                e.leftWing.rotation.z = Math.sin(flapSpeed) * 0.4;
+                e.rightWing.rotation.z = -Math.sin(flapSpeed) * 0.4;
+
+                // Enemy Movement Logic
+                if (e.enemyType === 1) {
+                    e.position.z += 0.25; 
+                } else {
+                    e.position.z += 0.12; 
+                    if (e.position.x < bird.position.x) e.position.x += 0.03;
+                    if (e.position.x > bird.position.x) e.position.x -= 0.03;
+                    if (e.position.y < bird.position.y) e.position.y += 0.03;
+                    if (e.position.y > bird.position.y) e.position.y -= 0.03;
+                }
+
+                if (e.position.z > 8) {
+                    scene.remove(e);
+                    enemies.splice(i, 1);
+                    continue; 
+                }
+
+                // Hit Detection with Feathers
+                let enemyDestroyed = false;
+                for (let j = feathers.length - 1; j >= 0; j--) {
+                    let f = feathers[j];
+                    // Birds are a bit bigger now, so we increased hit distance to 1.2
+                    if (e.position.distanceTo(f.position) < 1.2) {
+                        scene.remove(e); scene.remove(f);
+                        enemies.splice(i, 1); feathers.splice(j, 1);
+                        
+                        score += (e.enemyType === 1) ? 10 : 20; 
+                        scoreText.innerText = score;
+                        enemyDestroyed = true;
+                        break; 
+                    }
+                }
+                
+                // Hit Detection with Player
+                if (!enemyDestroyed) {
+                    if (e.position.distanceTo(bird.position) < 1.5) {
+                        scene.remove(e);
+                        enemies.splice(i, 1);
+                        takeDamage();
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+    </script>
+</body>
+</html>
