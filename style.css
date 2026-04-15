@@ -1,0 +1,47 @@
+body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 15px; margin: 0; }
+.main-container { width: 100%; max-width: 450px; }
+.card { background: white; padding: 20px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.04); margin-bottom: 20px; text-align: center; }
+.app-title { font-size: 1.2rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+
+.activity-scroll-container { display: flex; overflow-x: auto; gap: 12px; padding: 10px 5px; margin-bottom: 20px; -webkit-overflow-scrolling: touch; }
+.activity-scroll-container::-webkit-scrollbar { display: none; }
+
+.activity-tile { flex: 0 0 90px; height: 90px; border-radius: 18px; border: 3px solid transparent; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: #f8f9fa; padding: 10px; word-break: break-word; transition: 0.2s; }
+.activity-tile.selected { border-color: currentColor; transform: scale(1.05); background: white !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+#display { font-size: 4.5rem; font-weight: 800; margin: 20px 0; font-family: monospace; color: #222; }
+#startStopBtn, #startGameBtn { width: 100%; padding: 20px; border-radius: 50px; border: none; font-size: 1.5rem; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.1); transition: background 0.2s; }
+#startStopBtn { color: white; background: #333; }
+#startGameBtn { color: white; background: #007AFF; padding: 15px; font-size: 1.2rem; }
+
+.manual-link { display: block; margin-top: 20px; color: #007AFF; font-size: 0.9rem; cursor: pointer; text-decoration: none; }
+
+.goal-item { text-align: left; margin-bottom: 15px; }
+.goal-label { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; }
+.progress-bg { background: #eee; height: 10px; border-radius: 5px; overflow: hidden; }
+.progress-fill { height: 100%; transition: width 0.5s ease-in-out; }
+
+.add-column { display: flex; flex-direction: column; gap: 10px; }
+.add-row { display: flex; gap: 10px; justify-content: center; }
+input[type="number"], input[type="text"], input[type="color"] { padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; box-sizing: border-box; }
+input[type="color"] { padding: 0; width: 45px; height: 45px; cursor: pointer; }
+input[type="number"] { width: 80px; }
+.add-row button { padding: 0 20px; border-radius: 10px; border: none; background: #333; color: white; font-weight: bold; cursor: pointer; }
+
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.controls button { padding: 6px 12px; border: none; background: #eee; border-radius: 8px; font-weight: 600; cursor: pointer; margin-left: 5px; }
+
+.history-list { text-align: left; max-height: 200px; overflow-y: auto; margin-top: 15px; padding-right: 5px; }
+.activity-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+
+.edit-link { color: #007AFF; font-weight: 700; cursor: pointer; font-size: 0.8rem; margin-right: 15px; }
+.delete-link { color: #FF3B30; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+
+.danger-btn { background: none; border: 1px solid #FF3B30; color: #FF3B30; padding: 10px; width: 100%; border-radius: 12px; margin-top: 10px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.danger-btn:hover { background: #ffebeb; }
+.canvas-wrapper { height: 280px; position: relative; }
+
+/* Game Specific Styles */
+.game-card { overflow: hidden; }
+#gameCanvas { background: linear-gradient(#e0f2fe, #fff); border-radius: 15px; border: 2px solid #f0f0f0; width: 100%; height: 200px; display: block; touch-action: none; }
+#gameStats { font-weight: 800; color: #FF3B30; font-size: 1.1rem; }
