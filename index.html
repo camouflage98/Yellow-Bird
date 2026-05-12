@@ -1,56 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>3D Maid Shooter - Environment Update</title>
+    <title>3D Bird Shooter - Environment Update</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
-        
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 2px 2px 0 #000;
-            pointer-events: none;
-        }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; pointer-events: none; }
         .ui-text { margin-bottom: 10px; }
-        
-        #gameOver {
-            display: none; 
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            border: 4px solid red;
-        }
+        #gameOver { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 40px; border-radius: 15px; text-align: center; border: 4px solid red; }
         #gameOver h1 { margin: 0 0 20px 0; color: #ff4444; font-size: 48px;}
-        #gameOver button {
-            font-size: 24px;
-            padding: 10px 30px;
-            background: #44aa44;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
+        #gameOver button { font-size: 24px; padding: 10px 30px; background: #44aa44; color: white; border: none; border-radius: 8px; cursor: pointer; }
         #gameOver button:hover { background: #55cc55; }
-        
-        #damageFlash {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: red;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s;
-        }
+        #damageFlash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: red; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     </style>
 </head>
 <body>
@@ -58,9 +19,7 @@
         <div class="ui-text">Score: <span id="scoreText">0</span></div>
         <div class="ui-text">Lives: <span id="livesText" style="color: #ffaaaa;">5</span></div>
     </div>
-    
     <div id="damageFlash"></div>
-
     <div id="gameOver">
         <h1>GAME OVER</h1>
         <div class="ui-text">Final Score: <span id="finalScore">0</span></div>
@@ -68,10 +27,8 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     
     <script>
-        // --- AUDIO SYNTHESIZER ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
@@ -105,9 +62,7 @@
             osc.stop(audioCtx.currentTime + 0.2);
         }
 
-        // 1. SETTING UP THE WORLD
         const scene = new THREE.Scene();
-        // Add a gentle fog to hide obstacles popping into existence
         scene.fog = new THREE.Fog(0x87CEEB, 20, 50); 
         
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -123,12 +78,31 @@
         
         const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputEncoding = THREE.sRGBEncoding; 
         document.body.appendChild(renderer.domElement);
 
-        // 2. CREATING THE PLAYER (MAID MODEL)
+        // --- RESTORED YELLOW BIRD ---
         const bird = new THREE.Group();
-        scene.add(bird);
+
+        const bodyGeom = new THREE.SphereGeometry(0.6, 16, 16);
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0xffdd00 }); 
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        bird.add(body);
+
+        const beakGeom = new THREE.ConeGeometry(0.2, 0.6, 8);
+        const beakMat = new THREE.MeshLambertMaterial({ color: 0xff8800 }); 
+        const beak = new THREE.Mesh(beakGeom, beakMat);
+        beak.rotation.x = -Math.PI / 2; 
+        beak.position.z = -0.7;
+        bird.add(beak);
+
+        const wingGeom = new THREE.BoxGeometry(1.2, 0.1, 0.5);
+        const wingMat = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
+        const leftWing = new THREE.Mesh(wingGeom, wingMat);
+        leftWing.position.set(-0.8, 0, 0);
+        bird.add(leftWing);
+        const rightWing = new THREE.Mesh(wingGeom, wingMat);
+        rightWing.position.set(0.8, 0, 0);
+        bird.add(rightWing);
 
         const reticleGeom = new THREE.RingGeometry(0.5, 0.6, 16);
         const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
@@ -136,24 +110,12 @@
         reticle.position.z = -20; 
         bird.add(reticle);
 
-        const loader = new THREE.GLTFLoader();
-        loader.load(
-            'maid.glb', 
-            function (gltf) {
-                const model = gltf.scene;
-                model.scale.set(1.5, 1.5, 1.5); 
-                model.rotation.y = Math.PI; 
-                model.position.y = -1;
-                bird.add(model);
-            },
-            undefined, 
-            function (error) { console.error("Could not load model", error); }
-        );
+        scene.add(bird);
+        // -----------------------------
 
-        // 3. GAME VARIABLES
         const feathers = [];
         const enemies = [];
-        const obstacles = []; // NEW: Array for our environment hazards
+        const obstacles = [];
         
         let score = 0;
         let lives = 5;
@@ -178,7 +140,6 @@
             playShootSound();
         }
 
-        // 4. BUILDING ENEMIES & OBSTACLES
         function createEnemyBird(type) {
             const enemyGroup = new THREE.Group();
             let bColor, wColor, beakColor, scale;
@@ -231,7 +192,6 @@
             enemies.push(enemy);
         }
 
-        // --- NEW: OBSTACLE BUILDERS ---
         function createTree() {
             const group = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 3), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
@@ -275,24 +235,19 @@
             if (isGameOver) return;
             const rand = Math.random();
             let obs;
-            
-            // Pick a random obstacle
             if (rand < 0.33) obs = createTree();
             else if (rand < 0.66) obs = createHouse();
             else obs = createPowerLine();
 
-            // Spawn them low (on the "ground") and out of the fog
             const randomX = (Math.random() - 0.5) * 16; 
             obs.position.set(randomX, -4, -50); 
-            
             scene.add(obs);
             obstacles.push(obs);
         }
 
         setInterval(spawnEnemy, 1500);
-        setInterval(spawnObstacle, 2500); // Spawn an obstacle every 2.5 seconds
+        setInterval(spawnObstacle, 2500); 
 
-        // 5. CONTROLS
         let isFiring = false;
         let targetX = 0; 
         let targetY = 0;
@@ -328,21 +283,21 @@
             }
         }
 
-        // 6. THE GAME LOOP
         function animate() {
             if (isGameOver) return; 
             requestAnimationFrame(animate);
             const time = Date.now() * 0.01;
 
-            // Move Player
             bird.position.x += (targetX - bird.position.x) * 0.1;
             bird.position.y += (targetY - bird.position.y) * 0.1;
             bird.position.z += (0 - bird.position.z) * 0.1; 
+            
+            // Flap the yellow bird's wings again
+            leftWing.rotation.z = Math.sin(time) * 0.4;
+            rightWing.rotation.z = -Math.sin(time) * 0.4;
 
-            // Create a Bounding Box around the player for precise collision
             const playerBox = new THREE.Box3().setFromObject(bird);
 
-            // Raycasting / Aim Detection (Only targets enemies!)
             enemies.forEach(enemyBird => {
                 enemyBird.children.forEach(part => {
                     part.material.color.setHex(part.originalColor);
@@ -361,13 +316,11 @@
                 });
             }
 
-            // Shoot Feathers
             if (isFiring && (Date.now() - lastShotTime > shootCooldown)) {
                 shootFeather();
                 lastShotTime = Date.now();
             }
 
-            // Move Feathers
             for (let i = feathers.length - 1; i >= 0; i--) {
                 let f = feathers[i];
                 f.position.z -= 0.6; 
@@ -375,10 +328,9 @@
                 if (f.position.z < -50) { scene.remove(f); feathers.splice(i, 1); }
             }
 
-            // Move OBSTACLES & Check Collision
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
-                obs.position.z += 0.15; // Move at a steady ground speed
+                obs.position.z += 0.15; 
 
                 if (obs.position.z > 10) {
                     scene.remove(obs);
@@ -386,9 +338,8 @@
                     continue; 
                 }
 
-                // Check Box Collision with Player
                 const obsBox = new THREE.Box3().setFromObject(obs);
-                obsBox.expandByScalar(-0.4); // Make the hitbox slightly forgiving
+                obsBox.expandByScalar(-0.4); 
 
                 if (playerBox.intersectsBox(obsBox)) {
                     scene.remove(obs);
@@ -397,7 +348,6 @@
                 }
             }
 
-            // Move Enemies & Check Collision
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
                 
@@ -438,7 +388,6 @@
                 }
                 
                 if (!enemyDestroyed) {
-                    // We can use distance or Box3 here too. Distance is fine for the birds.
                     if (e.position.distanceTo(bird.position) < 1.5) {
                         scene.remove(e);
                         enemies.splice(i, 1);
